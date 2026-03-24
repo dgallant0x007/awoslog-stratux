@@ -4,25 +4,26 @@ set -euo pipefail
 # Deploy and install stratux-pusher on a Raspberry Pi running Stratux.
 #
 # Usage:
-#   ./deploy.sh <pi-host> [awoslog-server] [source-name]
+#   ./deploy.sh <pi-host> [source-name]
 #
 # Examples:
 #   ./deploy.sh 192.168.0.119
-#   ./deploy.sh 192.168.0.119 http://192.168.0.107:8080 stratux-home
-#   ./deploy.sh pi@192.168.0.119 https://awoslog.com my-stratux
+#   ./deploy.sh 192.168.0.119 my-stratux
+#   ./deploy.sh pi@192.168.0.119 hangar-stratux
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+AWOSLOG_SERVER="http://awoslog.com"
 PI_HOST="${1:-}"
-AWOSLOG_SERVER="${2:-http://awoslog.com}"
-SOURCE_NAME="${3:-stratux-home}"
+SOURCE_NAME="${2:-stratux-home}"
 
 if [ -z "$PI_HOST" ]; then
-    echo "Usage: $0 <pi-host> [awoslog-server] [source-name]"
+    echo "Usage: $0 <pi-host> [source-name]"
     echo ""
-    echo "  pi-host         SSH target (e.g., 192.168.0.119 or pi@192.168.0.119)"
-    echo "  awoslog-server   awoslog URL (default: http://awoslog.com)"
-    echo "  source-name      source identifier (default: stratux-home)"
+    echo "  pi-host      SSH target (e.g., 192.168.0.119 or pi@192.168.0.119)"
+    echo "  source-name  unique identifier for this receiver (default: stratux-home)"
+    echo ""
+    echo "Data is pushed to awoslog.com automatically."
     exit 1
 fi
 

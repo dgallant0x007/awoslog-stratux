@@ -4,18 +4,18 @@ Push live ADS-B aircraft data from a [Stratux](https://github.com/b3nn0/stratux)
 
 ## What It Does
 
-`stratux-pusher` is a small Go binary that runs on the Stratux Raspberry Pi. It reads the SBS/BaseStation data stream from the Stratux receiver, aggregates per-aircraft state, and POSTs a JSON snapshot to the awoslog.com server every 3 seconds.
+`stratux-pusher` is a small Go binary that runs on the Stratux Raspberry Pi. It reads the SBS/BaseStation data stream from the Stratux receiver, aggregates per-aircraft state, and POSTs a JSON snapshot to awoslog.com every 3 seconds.
 
 ```
 Stratux ADS-B Receiver
-    │  SBS data on port 30003
-    ▼
+    |  SBS data on port 30003
+    v
 stratux-pusher (this binary)
-    │  Parses SBS, aggregates state, POSTs every 3s
-    ▼
+    |  Parses SBS, aggregates state, POSTs every 3s
+    v
 awoslog.com
-    │  Displays red aircraft on the map via SSE
-    ▼
+    |  Displays red aircraft on the map via SSE
+    v
 Your browser — red icons = your local ADS-B
 ```
 
@@ -30,14 +30,13 @@ Aircraft received by your Stratux appear in **red** on the awoslog.com map, dist
 - A [Stratux](https://github.com/b3nn0/stratux) ADS-B receiver (any version with SBS output on port 30003)
 - Go 1.22+ on your build machine (for cross-compilation)
 - SSH access to the Stratux Raspberry Pi
-- An awoslog.com server instance (public or self-hosted)
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/dgallant0x007/awoslog-stratux.git
 cd awoslog-stratux
-./deploy.sh 192.168.0.119 http://your-awoslog-server:8080 stratux-home
+./deploy.sh 192.168.0.119
 ```
 
 That single command builds the ARM64 binary, copies it to the Pi, installs a systemd service, and starts it. Red aircraft should appear on the awoslog.com map within seconds.
@@ -59,26 +58,25 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o stratux-pusher .
 ## Deploying
 
 ```bash
-./deploy.sh <pi-host> [awoslog-server] [source-name]
+./deploy.sh <pi-host> [source-name]
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `pi-host` | (required) | SSH target — IP or `user@host` |
-| `awoslog-server` | `http://awoslog.com` | URL of the awoslog server |
 | `source-name` | `stratux-home` | Unique identifier for this receiver |
 
 ### Examples
 
 ```bash
-# Local network
-./deploy.sh 192.168.0.119 http://192.168.0.107:8080 stratux-home
-
-# Public server
-./deploy.sh pi@10.0.0.50 https://awoslog.com my-remote-stratux
-
-# Defaults (awoslog.com, source "stratux-home")
+# Deploy with defaults
 ./deploy.sh 192.168.0.119
+
+# Deploy with a custom source name
+./deploy.sh 192.168.0.119 my-stratux
+
+# Deploy with explicit SSH user
+./deploy.sh pi@192.168.0.119 hangar-stratux
 ```
 
 The deploy script:
@@ -121,16 +119,42 @@ stratux-pusher [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-sbs` | `localhost:30003` | SBS host:port to connect to |
-| `-server` | `http://awoslog.com` | awoslog server URL |
 | `-source` | `stratux-home` | Source identifier for this receiver |
 | `-interval` | `3s` | How often to push aircraft state |
-| `-key` | (empty) | Optional API key (if server requires it) |
+| `-key` | (empty) | Optional API key (if awoslog.com requires it) |
+
+## How It Works
+
+The Stratux receiver outputs SBS/BaseStation format on TCP port 30003 — one CSV line per message. The pusher reads three message types:
+
+| Type | Data | Fields |
+|------|------|--------|
+| MSG,1 | Identification | Callsign |
+| MSG,3 | Airborne position | Latitude, longitude, altitude |
+| MSG,4 | Airborne velocity | Ground speed, heading, vertical rate |
+
+Messages are aggregated per aircraft (keyed by ICAO hex code) to build a complete picture from the individual message fragments. Aircraft not seen for 60 seconds are removed.
+
+On the awoslog.com side, aircraft received from your pusher are:
+
+- Cross-referenced against the global ADS-B network (if your Stratux sees a hex code but no position, awoslog checks its API cache for that aircraft's location)
+- Enriched with registration (N-number) and aircraft type via hexdb.io lookup
+- Streamed to all connected browsers via Server-Sent Events (SSE)
+- Rendered as red icons on the map with hover popups showing all available details
+
+## Multiple Receivers
+
+Multiple Stratux devices can push to awoslog.com simultaneously. Give each a unique source name and the server merges them, deduplicating by hex code.
+
+```bash
+./deploy.sh 192.168.0.119 stratux-home
+./deploy.sh 192.168.0.120 stratux-hangar
+./deploy.sh 192.168.0.121 stratux-south-field
+```
 
 ## API
 
-The pusher sends a POST request to the awoslog server:
-
-### POST /api/stratux/push
+The pusher sends a POST to `http://awoslog.com/api/stratux/push`:
 
 ```json
 {
@@ -153,30 +177,6 @@ The pusher sends a POST request to the awoslog server:
 Aircraft with no position (Mode S only — hex and altitude but no lat/lon) are included so the server can cross-reference them against the global ADS-B network.
 
 **Response:** `{"status":"ok","accepted":5}`
-
-If the server has `AWOSLOG_STRATUX_KEY` set, include the key in the `X-Stratux-Key` header.
-
-## How the SBS Parser Works
-
-The Stratux receiver outputs SBS/BaseStation format on TCP port 30003 — one CSV line per message. The pusher reads three message types:
-
-| Type | Data | Fields |
-|------|------|--------|
-| MSG,1 | Identification | Callsign |
-| MSG,3 | Airborne position | Latitude, longitude, altitude |
-| MSG,4 | Airborne velocity | Ground speed, heading, vertical rate |
-
-Messages are aggregated per aircraft (keyed by ICAO hex code) to build a complete picture from the individual message fragments. Aircraft not seen for 60 seconds are removed.
-
-## Multiple Receivers
-
-Multiple Stratux devices can push to the same awoslog server simultaneously. Give each a unique `source-name` and the server merges them, deduplicating by hex code.
-
-```bash
-./deploy.sh 192.168.0.119 https://awoslog.com stratux-home
-./deploy.sh 192.168.0.120 https://awoslog.com stratux-hangar
-./deploy.sh 192.168.0.121 https://awoslog.com stratux-south-field
-```
 
 ## License
 
