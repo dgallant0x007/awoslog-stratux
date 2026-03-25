@@ -35,7 +35,7 @@ type pushPayload struct {
 
 var (
 	sbsAddr  = flag.String("sbs", "localhost:30003", "SBS host:port")
-	server   = flag.String("server", "http://awoslog.com", "awoslog server URL")
+	server   = flag.String("server", "https://awoslog.com", "awoslog server URL")
 	source   = flag.String("source", "stratux-home", "source identifier")
 	interval = flag.Duration("interval", 3*time.Second, "push interval")
 	apiKey   = flag.String("key", "", "optional API key")

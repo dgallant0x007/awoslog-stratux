@@ -1,6 +1,6 @@
 # awoslog-stratux
 
-Push live ADS-B aircraft data from a [Stratux](https://github.com/b3nn0/stratux) receiver to [awoslog.com](http://awoslog.com), where they appear as red aircraft on the map in real time.
+Push live ADS-B aircraft data from a [Stratux](https://github.com/b3nn0/stratux) receiver to [awoslog.com](https://awoslog.com), where they appear as red aircraft on the map in real time.
 
 ## What It Does
 
@@ -154,7 +154,7 @@ Multiple Stratux devices can push to awoslog.com simultaneously. Give each a uni
 
 ## API
 
-The pusher sends a POST to `http://awoslog.com/api/stratux/push`:
+The pusher sends a POST to `https://awoslog.com/api/stratux/push`:
 
 ```json
 {

@@ -13,7 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-AWOSLOG_SERVER="http://awoslog.com"
+AWOSLOG_SERVER="https://awoslog.com"
 PI_HOST="${1:-}"
 SOURCE_NAME="${2:-stratux-home}"
 
